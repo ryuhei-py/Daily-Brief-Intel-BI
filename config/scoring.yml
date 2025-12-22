@@ -1,0 +1,4 @@
+default_score: 0.0
+rules:
+  - name: default
+    weight: 1.0

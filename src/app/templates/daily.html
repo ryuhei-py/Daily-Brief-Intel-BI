@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Daily Brief{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Daily Brief</h2>
+  {% if latest_run %}
+    <p class="muted">Last successful run: {{ latest_run.run_id }}</p>
+    <p>Status: {{ latest_run.status }} | Mode: {{ latest_run.run_mode }}</p>
+    <p>Started: {{ latest_run.started_at }} | Ended: {{ latest_run.ended_at }}</p>
+  {% else %}
+    <p class="muted">No data yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
