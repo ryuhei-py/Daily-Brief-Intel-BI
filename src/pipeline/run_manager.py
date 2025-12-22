@@ -36,14 +36,17 @@ def create_run(
 def finish_run(run_id: str, status: str, conn: Optional[DuckDBPyConnection] = None) -> datetime:
     connection = conn or connect()
     ended_at = datetime.now(timezone.utc)
-    connection.execute(
-        """
-        UPDATE fact_run SET ended_at = ?, status = ?
-        WHERE run_id = ?
-        """,
-        [ended_at, status, run_id],
-    )
-    connection.commit()
+    try:
+        connection.execute(
+            """
+            UPDATE fact_run SET ended_at = ?, status = ?
+            WHERE run_id = ?
+            """,
+            [ended_at, status, run_id],
+        )
+        connection.commit()
+    except Exception as exc:  # pragma: no cover - best-effort
+        logger.warning("finish_run could not update fact_run for %s: %s", run_id, exc)
     logger.info("Finished run %s status=%s", run_id, status)
     return ended_at
 

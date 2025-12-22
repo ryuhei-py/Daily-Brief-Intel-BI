@@ -143,120 +143,127 @@ def run_pipeline(
     sources_config = load_sources_config(config_path)
     init_db()
     conn = connect()
+    run_started_at = None
 
     run_id = _ensure_run_id(conn, run_id, overwrite_run)
     if overwrite_run:
         shutil.rmtree(_output_root() / run_id, ignore_errors=True)
-    started_at = datetime.now(timezone.utc)
-    create_run(run_mode=mode, params_json="{}", conn=conn, run_id=run_id)
+    try:
+        run_id, run_started_at = create_run(run_mode=mode, params_json="{}", conn=conn, run_id=run_id)
 
-    allowed_urls = {s.url for s in sources_config.sources if s.url}
-    fetch_fn = fetcher or _default_fetcher
+        allowed_urls = {s.url for s in sources_config.sources if s.url}
+        fetch_fn = fetcher or _default_fetcher
 
-    collected_items: List[Dict[str, object]] = []
-    source_stats: Dict[str, dict] = {}
+        collected_items: List[Dict[str, object]] = []
+        source_stats: Dict[str, dict] = {}
 
-    for source in sources_config.sources:
-        if not source.enabled:
-            source_stats[source.id] = {"status": "disabled", "count": 0, "error": None}
+        for source in sources_config.sources:
+            if not source.enabled:
+                source_stats[source.id] = {"status": "disabled", "count": 0, "error": None}
 
-    enabled_sources = [s for s in sources_config.sources if s.enabled]
-    for source in enabled_sources:
-        request_url = source.url or ""
-        try:
-            if source.kind == "rss":
-                content = fetch_fn(request_url, allowed_urls)
-                items = parse_rss(content, source.model_dump())
-            elif source.kind == "estat_api":
-                request_url = build_estat_url(request_url, source.params)
-                allowed_urls.add(source.url)
-                content = fetch_fn(request_url, allowed_urls)
-                items = parse_estat(content, source.model_dump())
-            else:
-                raise ValueError(f"Unsupported source kind: {source.kind}")
-            source_stats[source.id] = {"status": "success", "count": len(items), "error": None}
-            collected_items.extend(items)
-            record_source_run(
-                run_id=run_id,
-                source_id=source.id,
-                started_at=started_at,
-                ended_at=datetime.now(timezone.utc),
-                status="success",
-                item_count=len(items),
-                conn=conn,
+        enabled_sources = [s for s in sources_config.sources if s.enabled]
+        for source in enabled_sources:
+            request_url = source.url or ""
+            source_started_at = datetime.now(timezone.utc)
+            try:
+                if source.kind == "rss":
+                    content = fetch_fn(request_url, allowed_urls)
+                    items = parse_rss(content, source.model_dump())
+                elif source.kind == "estat_api":
+                    request_url = build_estat_url(request_url, source.params)
+                    allowed_urls.add(source.url)
+                    content = fetch_fn(request_url, allowed_urls)
+                    items = parse_estat(content, source.model_dump())
+                else:
+                    raise ValueError(f"Unsupported source kind: {source.kind}")
+                source_stats[source.id] = {"status": "success", "count": len(items), "error": None}
+                collected_items.extend(items)
+                record_source_run(
+                    run_id=run_id,
+                    source_id=source.id,
+                    started_at=source_started_at,
+                    ended_at=datetime.now(timezone.utc),
+                    status="success",
+                    item_count=len(items),
+                    conn=conn,
+                )
+            except Exception as exc:
+                logger.warning("Source %s failed: %s", source.id, exc)
+                source_stats[source.id] = {"status": "failed", "count": 0, "error": str(exc)}
+                record_source_run(
+                    run_id=run_id,
+                    source_id=source.id,
+                    started_at=source_started_at,
+                    ended_at=datetime.now(timezone.utc),
+                    status="failed",
+                    item_count=0,
+                    error_class=exc.__class__.__name__,
+                    error_message=str(exc),
+                    conn=conn,
+                )
+
+        unique_items = _dedupe_items(collected_items)
+
+        overall_status = "success"
+        if any(stat["status"] == "failed" for stat in source_stats.values()):
+            overall_status = "partial"
+        if not enabled_sources:
+            overall_status = "failed"
+
+        for source in sources_config.sources:
+            conn.execute(
+                """
+                INSERT INTO sources (run_id, source_id, source_name, category, kind, enabled)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [run_id, source.id, source.name, source.category, source.kind, source.enabled],
             )
-        except Exception as exc:
-            logger.warning("Source %s failed: %s", source.id, exc)
-            source_stats[source.id] = {"status": "failed", "count": 0, "error": str(exc)}
-            record_source_run(
-                run_id=run_id,
-                source_id=source.id,
-                started_at=started_at,
-                ended_at=datetime.now(timezone.utc),
-                status="failed",
-                item_count=0,
-                error_class=exc.__class__.__name__,
-                error_message=str(exc),
-                conn=conn,
+
+        for item in unique_items:
+            conn.execute(
+                """
+                INSERT INTO items (
+                    run_id, source_id, source_name, category, kind,
+                    title, summary, url, published_at, fetched_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    run_id,
+                    item["source_id"],
+                    item["source_name"],
+                    item["category"],
+                    item["kind"],
+                    item["title"],
+                    item["summary"],
+                    item["url"],
+                    item["published_at"],
+                    item["fetched_at"],
+                ],
             )
 
-    unique_items = _dedupe_items(collected_items)
-
-    overall_status = "success"
-    if any(stat["status"] == "failed" for stat in source_stats.values()):
-        overall_status = "partial"
-    if not enabled_sources:
-        overall_status = "failed"
-
-    for source in sources_config.sources:
+        finished_at = datetime.now(timezone.utc)
         conn.execute(
             """
-            INSERT INTO sources (run_id, source_id, source_name, category, kind, enabled)
+            INSERT INTO runs (run_id, started_at, finished_at, status, item_count, source_count)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            [run_id, source.id, source.name, source.category, source.kind, source.enabled],
+            [run_id, run_started_at, finished_at, overall_status, len(unique_items), len(enabled_sources)],
         )
-
-    for item in unique_items:
-        conn.execute(
-            """
-            INSERT INTO items (
-                run_id, source_id, source_name, category, kind,
-                title, summary, url, published_at, fetched_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                run_id,
-                item["source_id"],
-                item["source_name"],
-                item["category"],
-                item["kind"],
-                item["title"],
-                item["summary"],
-                item["url"],
-                item["published_at"],
-                item["fetched_at"],
-            ],
-        )
-
-    finished_at = datetime.now(timezone.utc)
-    conn.execute(
-        """
-        INSERT INTO runs (run_id, started_at, finished_at, status, item_count, source_count)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        [run_id, started_at, finished_at, overall_status, len(unique_items), len(enabled_sources)],
-    )
-    conn.commit()
-    finish_run(run_id=run_id, status=overall_status, conn=conn)
-    conn.close()
+        conn.commit()
+        finish_run(run_id=run_id, status=overall_status, conn=conn)
+    except Exception:
+        if run_id:
+            finish_run(run_id=run_id, status="failed", conn=conn)
+        raise
+    finally:
+        conn.close()
 
     stats = {
         "run_id": run_id,
         "status": overall_status,
         "mode": mode,
-        "started_at": started_at.isoformat(),
+        "started_at": run_started_at.isoformat() if run_started_at else None,
         "finished_at": finished_at.isoformat(),
         "item_count": len(unique_items),
         "source_count": len(enabled_sources),
