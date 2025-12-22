@@ -214,3 +214,8 @@ output/
 *.duckdb
 output/
 
+
+# Local DB
+*.duckdb
+output/
+
