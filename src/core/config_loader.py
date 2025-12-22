@@ -7,7 +7,7 @@ from typing import Any, Dict, Tuple
 import yaml
 from pydantic import ValidationError
 
-from .config_schema import CONFIG_MODEL_MAP
+from .config_schema import CONFIG_MODEL_MAP, SourcesConfig
 from .logging import get_logger
 
 logger = get_logger(__name__)
@@ -51,6 +51,11 @@ def load_configs(config_dir: Path) -> Dict[str, Any]:
         data = load_yaml(path)
         configs[filename] = model_cls(**data)
     return configs
+
+
+def load_sources_config(config_dir: Path) -> SourcesConfig:
+    data = load_yaml(config_dir / "sources.yml")
+    return SourcesConfig(**data)
 
 
 def print_validation_report(config_dir: Path) -> int:

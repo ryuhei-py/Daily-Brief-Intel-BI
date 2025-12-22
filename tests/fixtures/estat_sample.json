@@ -1,0 +1,25 @@
+{
+  "GET_STATS_DATA": {
+    "STATISTICAL_DATA": {
+      "TABLE_INF": {
+        "TITLE": {
+          "@title": "Population Quarterly"
+        }
+      },
+      "DATA_INF": {
+        "VALUE": [
+          {
+            "@tab": "Population",
+            "@time": "2024Q1",
+            "$": "125000000"
+          },
+          {
+            "@tab": "Population",
+            "@time": "2023Q4",
+            "$": "124500000"
+          }
+        ]
+      }
+    }
+  }
+}

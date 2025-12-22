@@ -16,9 +16,10 @@ def create_run(
     run_mode: str,
     params_json: Optional[str] = None,
     conn: Optional[DuckDBPyConnection] = None,
+    run_id: Optional[str] = None,
 ) -> tuple[str, datetime]:
     connection = conn or connect()
-    run_id = str(uuid4())
+    run_id = run_id or str(uuid4())
     started_at = datetime.now(timezone.utc)
     connection.execute(
         """
@@ -32,9 +33,7 @@ def create_run(
     return run_id, started_at
 
 
-def finish_run(
-    run_id: str, status: str, conn: Optional[DuckDBPyConnection] = None
-) -> datetime:
+def finish_run(run_id: str, status: str, conn: Optional[DuckDBPyConnection] = None) -> datetime:
     connection = conn or connect()
     ended_at = datetime.now(timezone.utc)
     connection.execute(

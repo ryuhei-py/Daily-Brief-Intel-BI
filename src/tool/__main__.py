@@ -4,10 +4,10 @@ import argparse
 import sys
 from pathlib import Path
 
+from src.app.pipeline import run_pipeline
 from src.core.config_loader import print_validation_report
 from src.core.logging import get_logger
 from src.pipeline.run_lock import RunLock, RunLockedError
-from src.pipeline.run_manager import create_run, finish_run
 from src.storage.migrate import init_db
 
 logger = get_logger(__name__)
@@ -35,8 +35,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     try:
         init_db()
-        run_id, _ = create_run(run_mode=args.mode, params_json="{}")
-        finish_run(run_id=run_id, status="success")
+        run_id, _ = run_pipeline(config_dir=args.config_dir, mode=args.mode)
         logger.info("Run %s finished in mode=%s", run_id, args.mode)
         return 0
     except Exception as exc:  # pragma: no cover
@@ -60,6 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     run_parser = subparsers.add_parser("run", help="Manage runs")
     run_parser.add_argument("mode", choices=["manual", "scheduled"], help="Run mode")
+    run_parser.add_argument("--config-dir", default="config", help="Path to config directory")
     run_parser.set_defaults(func=cmd_run)
 
     return parser
