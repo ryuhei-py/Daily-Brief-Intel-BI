@@ -16,13 +16,22 @@ def build_valid_configs(tmp_path: Path) -> Path:
         {
             "sources": [
                 {
-                    "source_id": "source_a",
+                    "id": "source_a",
+                    "name": "Source A",
+                    "category": "jp",
                     "kind": "rss",
+                    "url": "https://example.com/rss",
                     "enabled": True,
-                    "content_level": "summary",
-                    "rate_limit": {"requests_per_minute": 10},
-                    "compliance": {"gdpr": True},
-                }
+                },
+                {
+                    "id": "source_b",
+                    "name": "Source B",
+                    "category": "global",
+                    "kind": "estat_api",
+                    "params": {"dataset_id": "123", "table_id": "1"},
+                    "url": "https://api.example.com",
+                    "enabled": False,
+                },
             ]
         },
     )
@@ -77,11 +86,10 @@ def test_validate_config_failure(tmp_path: Path):
         {
             "sources": [
                 {
+                    "name": "Missing ID",
                     "kind": "rss",
+                    "url": "https://example.com",
                     "enabled": True,
-                    "content_level": "summary",
-                    "rate_limit": {"requests_per_minute": 10},
-                    "compliance": {"gdpr": True},
                 }
             ]
         },

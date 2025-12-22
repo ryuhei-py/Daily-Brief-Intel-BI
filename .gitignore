@@ -210,3 +210,7 @@ __marimo__/
 output/
 .duckdb
 .db
+# local databases
+*.duckdb
+output/
+

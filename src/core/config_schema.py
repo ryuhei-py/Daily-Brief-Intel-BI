@@ -1,26 +1,41 @@
 from __future__ import annotations
 
 from datetime import time
-from typing import Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
 
-class RateLimit(BaseModel):
-    requests_per_minute: int = Field(gt=0)
-
-
 class SourceEntry(BaseModel):
-    source_id: str
-    kind: str
-    enabled: bool
-    content_level: str
-    rate_limit: RateLimit
-    compliance: dict[str, bool]
+    id: str
+    name: str
+    category: str
+    enabled: bool = True
+    kind: Literal["rss", "estat_api"]
+    url: Optional[str] = None
+    params: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_kind_requirements(self) -> "SourceEntry":
+        if self.kind == "rss" and not self.url:
+            raise ValueError("url is required for rss sources")
+        if self.kind == "estat_api":
+            if not self.url:
+                raise ValueError("url is required for estat_api sources")
+            if not self.params:
+                raise ValueError("params are required for estat_api sources")
+        return self
 
 
 class SourcesConfig(BaseModel):
     sources: list[SourceEntry]
+
+    @model_validator(mode="after")
+    def ensure_unique_ids(self) -> "SourcesConfig":
+        ids = [s.id for s in self.sources]
+        if len(ids) != len(set(ids)):
+            raise ValueError("source ids must be unique")
+        return self
 
 
 class WatchlistPolicy(BaseModel):
