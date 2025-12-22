@@ -1,25 +1,12 @@
-CREATE TABLE IF NOT EXISTS fact_run (
-    run_id TEXT PRIMARY KEY,
-    started_at TIMESTAMP,
-    ended_at TIMESTAMP,
-    status TEXT,
-    run_mode TEXT,
-    params_json TEXT
-);
+from __future__ import annotations
 
-CREATE TABLE IF NOT EXISTS fact_source_run (
-    run_id TEXT,
-    source_id TEXT,
-    started_at TIMESTAMP,
-    ended_at TIMESTAMP,
-    status TEXT,
-    item_count INTEGER,
-    error_class TEXT,
-    error_message TEXT,
-    http_status INTEGER,
-    PRIMARY KEY (run_id, source_id)
-);
+from pathlib import Path
 
+import duckdb
+
+from src.app.config import Settings
+
+SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY,
     started_at TIMESTAMP,
@@ -52,3 +39,22 @@ CREATE TABLE IF NOT EXISTS alerts (
     alert_type TEXT,
     message TEXT
 );
+"""
+
+
+def get_connection(settings: Settings):
+    db_path: Path = settings.db_path
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    return duckdb.connect(str(db_path))
+
+
+def ensure_schema(conn) -> None:
+    conn.execute(SCHEMA_SQL)
+    conn.commit()
+
+
+def init_db(settings: Settings) -> Path:
+    conn = get_connection(settings)
+    ensure_schema(conn)
+    conn.close()
+    return settings.db_path

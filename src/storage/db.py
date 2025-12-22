@@ -4,7 +4,7 @@ from typing import Optional
 
 import duckdb
 
-DEFAULT_DB_PATH = Path("output/db/app.duckdb")
+DEFAULT_DB_PATH = Path("data/app.duckdb")
 
 
 def get_db_path() -> Path:

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from src.core.config_loader import validate_config_dir
+from src.app.config import validate_config
 
 
 def write_yaml(path: Path, data) -> None:
@@ -12,59 +12,28 @@ def write_yaml(path: Path, data) -> None:
 
 def build_valid_configs(tmp_path: Path) -> Path:
     write_yaml(
+        tmp_path / "settings.yml",
+        {
+            "db_path": str(tmp_path / "data/app.duckdb"),
+            "output_root": str(tmp_path / "output"),
+            "run_time": "07:00",
+        },
+    )
+    write_yaml(
         tmp_path / "sources.yml",
         {
             "sources": [
-                {
-                    "source_id": "source_a",
-                    "kind": "rss",
-                    "enabled": True,
-                    "content_level": "summary",
-                    "rate_limit": {"requests_per_minute": 10},
-                    "compliance": {"gdpr": True},
-                }
+                {"name": "tokyo_daily", "category": "jp", "enabled": True},
+                {"name": "global_wire", "category": "global", "enabled": True},
             ]
         },
-    )
-    write_yaml(
-        tmp_path / "watchlist.yml",
-        {
-            "watchlist_policy": {"limit_enabled": False},
-            "matching_policy": {"match_order": "linear"},
-            "watch_entities": [],
-        },
-    )
-    write_yaml(
-        tmp_path / "geo.yml",
-        {
-            "geo_rollups": {
-                "tokyo_metro": ["Tokyo", "Kanagawa", "Chiba", "Saitama"],
-            }
-        },
-    )
-    write_yaml(tmp_path / "schedule.yml", {"daily_time_jst": "07:00"})
-    write_yaml(
-        tmp_path / "series.yml",
-        {
-            "series": [
-                {"key": "headline_series", "resolver": {"type": "passthrough", "value": "title"}}
-            ]
-        },
-    )
-    write_yaml(
-        tmp_path / "scoring.yml",
-        {"default_score": 0.0, "rules": [{"name": "base", "weight": 1.0}]},
-    )
-    write_yaml(
-        tmp_path / "alerts.yml",
-        {"enabled": True, "channels": [{"channel": "email", "target": "ops@example.com"}]},
     )
     return tmp_path
 
 
 def test_validate_config_success(tmp_path: Path):
     config_dir = build_valid_configs(tmp_path)
-    ok, messages = validate_config_dir(config_dir)
+    ok, messages = validate_config(config_dir)
     assert ok
     assert all("ok" in msg for msg in messages)
 
@@ -76,16 +45,10 @@ def test_validate_config_failure(tmp_path: Path):
         config_dir / "sources.yml",
         {
             "sources": [
-                {
-                    "kind": "rss",
-                    "enabled": True,
-                    "content_level": "summary",
-                    "rate_limit": {"requests_per_minute": 10},
-                    "compliance": {"gdpr": True},
-                }
+                {"name": "tokyo_daily", "category": "jp", "enabled": True},
             ]
         },
     )
-    ok, messages = validate_config_dir(config_dir)
+    ok, messages = validate_config(config_dir)
     assert not ok
     assert any("sources.yml" in msg for msg in messages)

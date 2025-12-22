@@ -32,9 +32,7 @@ def create_run(
     return run_id, started_at
 
 
-def finish_run(
-    run_id: str, status: str, conn: Optional[DuckDBPyConnection] = None
-) -> datetime:
+def finish_run(run_id: str, status: str, conn: Optional[DuckDBPyConnection] = None) -> datetime:
     connection = conn or connect()
     ended_at = datetime.now(timezone.utc)
     connection.execute(

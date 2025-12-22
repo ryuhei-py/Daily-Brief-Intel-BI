@@ -1,9 +1,7 @@
 sources:
-  - source_id: sample_feed
-    kind: rss
+  - name: tokyo_daily
+    category: jp
     enabled: true
-    content_level: summary
-    rate_limit:
-      requests_per_minute: 60
-    compliance:
-      gdpr: true
+  - name: global_wire
+    category: global
+    enabled: true
