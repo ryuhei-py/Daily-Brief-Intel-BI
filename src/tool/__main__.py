@@ -35,7 +35,12 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     try:
         init_db()
-        run_id, _ = run_pipeline(config_dir=args.config_dir, mode=args.mode)
+        run_id, _ = run_pipeline(
+            config_dir=args.config_dir,
+            mode=args.mode,
+            run_id=args.run_id,
+            overwrite_run=args.overwrite_run,
+        )
         logger.info("Run %s finished in mode=%s", run_id, args.mode)
         return 0
     except Exception as exc:  # pragma: no cover
@@ -60,6 +65,12 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="Manage runs")
     run_parser.add_argument("mode", choices=["manual", "scheduled"], help="Run mode")
     run_parser.add_argument("--config-dir", default="config", help="Path to config directory")
+    run_parser.add_argument("--run-id", help="Optional run identifier to use")
+    run_parser.add_argument(
+        "--overwrite-run",
+        action="store_true",
+        help="Overwrite existing data for the provided run id if it exists",
+    )
     run_parser.set_defaults(func=cmd_run)
 
     return parser

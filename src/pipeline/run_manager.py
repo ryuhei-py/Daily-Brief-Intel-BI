@@ -83,3 +83,33 @@ def record_source_run(
     )
     connection.commit()
     logger.info("Recorded source run %s for %s status=%s", run_id, source_id, status)
+
+
+def run_exists(run_id: str, conn: Optional[DuckDBPyConnection] = None) -> bool:
+    connection = conn or connect()
+    try:
+        exists = connection.execute(
+            "SELECT 1 FROM runs WHERE run_id = ? LIMIT 1", [run_id]
+        ).fetchone()
+        if exists:
+            return True
+    except Exception:
+        pass
+    try:
+        exists_fact = connection.execute(
+            "SELECT 1 FROM fact_run WHERE run_id = ? LIMIT 1", [run_id]
+        ).fetchone()
+        return bool(exists_fact)
+    except Exception:
+        return False
+
+
+def delete_run(run_id: str, conn: Optional[DuckDBPyConnection] = None) -> None:
+    connection = conn or connect()
+    for table in ("fact_source_run", "items", "sources", "alerts", "runs", "fact_run"):
+        try:
+            connection.execute(f"DELETE FROM {table} WHERE run_id = ?", [run_id])
+        except Exception:
+            continue
+    connection.commit()
+    logger.info("Deleted existing run data for %s", run_id)
