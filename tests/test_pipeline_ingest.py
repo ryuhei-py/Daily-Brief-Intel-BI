@@ -58,8 +58,24 @@ def test_pipeline_ingests_and_exports(tmp_path: Path, monkeypatch):
 
     # DB assertions
     conn = duckdb.connect(str(db_path))
-    item_count = conn.execute("SELECT COUNT(*) FROM items WHERE run_id = ?", [run_id]).fetchone()[0]
+    item_count = conn.execute(
+        "SELECT COUNT(*) FROM items WHERE run_id = ?", [run_id]
+    ).fetchone()[0]
     assert item_count >= 2
+
+    fact_run = conn.execute(
+        "SELECT run_id, started_at, ended_at, status FROM fact_run WHERE run_id = ?", [run_id]
+    ).fetchone()
+    assert fact_run is not None
+    assert fact_run[1] is not None and fact_run[2] is not None
+
+    source_rows = conn.execute(
+        "SELECT source_id, started_at, ended_at FROM fact_source_run WHERE run_id = ?", [run_id]
+    ).fetchall()
+    assert source_rows
+    for _, start, end in source_rows:
+        assert start is not None and end is not None
+        assert start <= end
 
     # Export assertions
     assert (output_dir / "brief_items.csv").exists()
