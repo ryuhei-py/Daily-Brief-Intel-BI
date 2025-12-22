@@ -3,17 +3,24 @@ from __future__ import annotations
 import csv
 import json
 import os
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Tuple
-from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from src.app.ingest.estat import build_estat_url, parse_estat
 from src.app.ingest.fetch import fetch_text
 from src.app.ingest.rss import parse_rss
 from src.core.config_loader import load_sources_config
 from src.core.logging import get_logger
-from src.pipeline.run_manager import create_run, finish_run, record_source_run
+from src.pipeline.run_manager import (
+    create_run,
+    delete_run,
+    finish_run,
+    record_source_run,
+    run_exists,
+)
 from src.storage.db import connect
 from src.storage.migrate import init_db
 
@@ -26,6 +33,45 @@ def _output_root() -> Path:
 
 def _default_fetcher(url: str, allowed_urls: Iterable[str]) -> str:
     return fetch_text(url, allowed_urls=allowed_urls)
+
+
+def _generate_run_id() -> str:
+    jst = ZoneInfo("Asia/Tokyo")
+    now = datetime.now(tz=jst)
+    return now.strftime("run-%Y%m%d-%H%M%S")
+
+
+def _base_run_id(cli_run_id: str | None) -> str:
+    if cli_run_id:
+        return cli_run_id
+    env_id = os.getenv("RUN_ID")
+    if env_id:
+        return env_id
+    return _generate_run_id()
+
+
+def _ensure_run_id(
+    conn,
+    desired_run_id: str | None,
+    overwrite: bool,
+) -> str:
+    base = _base_run_id(desired_run_id)
+    if overwrite:
+        if run_exists(base, conn=conn):
+            delete_run(base, conn=conn)
+            logger.info("Existing run %s removed due to overwrite flag.", base)
+        return base
+
+    if not run_exists(base, conn=conn):
+        return base
+
+    suffix = 2
+    while True:
+        candidate = f"{base}-{suffix:02d}"
+        if not run_exists(candidate, conn=conn):
+            logger.info("Run id %s exists; using %s", base, candidate)
+            return candidate
+        suffix += 1
 
 
 def _write_exports(run_id: str, items: List[Dict[str, object]], stats: dict) -> Path:
@@ -90,13 +136,17 @@ def run_pipeline(
     config_dir: Path | str = "config",
     mode: str = "manual",
     fetcher: Callable[[str, Iterable[str]], str] | None = None,
+    run_id: str | None = None,
+    overwrite_run: bool = False,
 ) -> Tuple[str, Path]:
     config_path = Path(config_dir)
     sources_config = load_sources_config(config_path)
     init_db()
     conn = connect()
 
-    run_id = os.getenv("RUN_ID") or str(uuid4())
+    run_id = _ensure_run_id(conn, run_id, overwrite_run)
+    if overwrite_run:
+        shutil.rmtree(_output_root() / run_id, ignore_errors=True)
     started_at = datetime.now(timezone.utc)
     create_run(run_mode=mode, params_json="{}", conn=conn, run_id=run_id)
 
@@ -151,11 +201,6 @@ def run_pipeline(
             )
 
     unique_items = _dedupe_items(collected_items)
-
-    # Persist metadata
-    conn.execute("DELETE FROM runs WHERE run_id = ?", [run_id])
-    conn.execute("DELETE FROM sources WHERE run_id = ?", [run_id])
-    conn.execute("DELETE FROM items WHERE run_id = ?", [run_id])
 
     overall_status = "success"
     if any(stat["status"] == "failed" for stat in source_stats.values()):
