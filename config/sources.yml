@@ -1,0 +1,9 @@
+sources:
+  - source_id: sample_feed
+    kind: rss
+    enabled: true
+    content_level: summary
+    rate_limit:
+      requests_per_minute: 60
+    compliance:
+      gdpr: true

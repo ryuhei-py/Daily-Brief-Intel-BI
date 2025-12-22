@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Daily Brief{% endblock %}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f7f7f7; }
+    header { background: #0f172a; color: #fff; padding: 12px 20px; }
+    nav a { color: #cbd5e1; margin-right: 12px; text-decoration: none; }
+    nav a:hover { color: #fff; }
+    main { padding: 20px; }
+    .card { background: #fff; padding: 16px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+    .muted { color: #64748b; }
+    .alert { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="/daily">Daily</a>
+      <a href="/run/manual">Manual Run</a>
+      <a href="/exports">Exports</a>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

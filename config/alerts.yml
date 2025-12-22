@@ -1,0 +1,4 @@
+enabled: true
+channels:
+  - channel: email
+    target: ops@example.com

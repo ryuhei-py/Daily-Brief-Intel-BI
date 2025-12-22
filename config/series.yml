@@ -1,0 +1,5 @@
+series:
+  - key: headline_series
+    resolver:
+      type: passthrough
+      value: headline
