@@ -22,6 +22,58 @@
 
 {% if latest_run %}
   <div class="card" style="margin-top:16px;">
+    <h3>Source health (last 20 runs)</h3>
+    {% if not health %}
+      <p class="muted">No source history yet.</p>
+    {% else %}
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding: 6px 4px;">Source</th>
+            <th style="text-align:left; padding: 6px 4px;">Success</th>
+            <th style="text-align:left; padding: 6px 4px;">Runs</th>
+            <th style="text-align:left; padding: 6px 4px;">Consec fails</th>
+            <th style="text-align:left; padding: 6px 4px;">Last</th>
+            <th style="text-align:left; padding: 6px 4px;">Avg sec</th>
+            <th style="text-align:left; padding: 6px 4px;">Last error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in health %}
+            <tr>
+              <td style="padding: 6px 4px; vertical-align: top;">{{ row.source_name }}</td>
+              <td style="padding: 6px 4px; vertical-align: top;">
+                {% if row.success_rate is not none %}
+                  {{ "%.0f"|format(row.success_rate) }}%
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td style="padding: 6px 4px; vertical-align: top;">{{ row.runs }}</td>
+              <td style="padding: 6px 4px; vertical-align: top;">{{ row.consecutive_failures }}</td>
+              <td style="padding: 6px 4px; vertical-align: top;">
+                {{ row.last_status }}{% if row.last_ended_at %} @ {{ row.last_ended_at }}{% endif %}
+              </td>
+              <td style="padding: 6px 4px; vertical-align: top;">
+                {% if row.avg_duration_seconds is not none %}{{ row.avg_duration_seconds }}{% else %}-{% endif %}
+              </td>
+              <td style="padding: 6px 4px; vertical-align: top;">
+                {% if row.last_http_status or row.last_error_class %}
+                  {{ row.last_http_status }} {{ row.last_error_class }}{% if row.last_error_message %}: {{ row.last_error_message[:120] }}{% endif %}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+{% endif %}
+
+{% if latest_run %}
+  <div class="card" style="margin-top:16px;">
     <h3>Items</h3>
     {% if items %}
       <table style="width:100%; border-collapse: collapse;">

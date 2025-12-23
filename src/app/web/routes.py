@@ -54,6 +54,7 @@ def daily(
     latest_run = None
     items = []
     counts = []
+    health = []
     conn = None
 
     try:
@@ -62,6 +63,7 @@ def daily(
         if latest_run:
             items = queries.get_items_for_run(conn, latest_run["run_id"], limit=200)
             counts = queries.get_item_counts_by_source(conn, latest_run["run_id"])
+            health = queries.get_source_health(conn, latest_run["run_id"], lookback_runs=20)
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("Could not read run history: %s", exc)
     finally:
@@ -76,6 +78,7 @@ def daily(
             "latest_run": latest_run,
             "items": items,
             "counts": counts,
+            "health": health,
         },
     )
 
