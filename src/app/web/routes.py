@@ -52,14 +52,25 @@ def daily(
     user: SessionData = Depends(get_current_user),
 ) -> HTMLResponse:
     latest_run = None
+    items = []
+    counts = []
     try:
         conn = connect()
-        latest_run = queries.get_latest_success_run(conn)
+        latest_run = queries.get_latest_run(conn)
+        if latest_run:
+            items = queries.get_items_for_run(conn, latest_run["run_id"], limit=200)
+            counts = queries.get_item_counts_by_source(conn, latest_run["run_id"])
     except Exception as exc:  # pragma: no cover - defensive
         logger.warning("Could not read run history: %s", exc)
     return templates.TemplateResponse(
         "daily.html",
-        {"request": request, "user": user, "latest_run": latest_run},
+        {
+            "request": request,
+            "user": user,
+            "latest_run": latest_run,
+            "items": items,
+            "counts": counts,
+        },
     )
 
 
