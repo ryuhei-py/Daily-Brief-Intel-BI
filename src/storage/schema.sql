@@ -68,3 +68,25 @@ CREATE TABLE IF NOT EXISTS dim_series_resolution (
     message TEXT,
     updated_at TIMESTAMP
 );
+
+-- Indicator series registry (materialized resolved series)
+CREATE TABLE IF NOT EXISTS dim_indicator_series (
+    series_key TEXT PRIMARY KEY,
+    resolved_id TEXT NOT NULL,
+    resolver_type TEXT,
+    resolver_value TEXT,
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Per-run audit snapshot of series resolution
+CREATE TABLE IF NOT EXISTS fact_indicator_series_run (
+    run_id TEXT NOT NULL,
+    series_key TEXT NOT NULL,
+    resolved_id TEXT,
+    status TEXT NOT NULL,
+    message TEXT,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (run_id, series_key)
+);
