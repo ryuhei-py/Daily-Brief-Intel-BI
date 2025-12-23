@@ -14,8 +14,10 @@ def test_init_db_creates_tables(tmp_path: Path):
     assert {
         "fact_run",
         "fact_source_run",
+        "fact_indicator_series_run",
         "runs",
         "sources",
         "items",
         "dim_series_resolution",
+        "dim_indicator_series",
     }.issubset(tables)

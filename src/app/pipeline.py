@@ -9,11 +9,14 @@ from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Tuple
 from zoneinfo import ZoneInfo
 
+import yaml
+
 from src.app.ingest.estat import build_estat_url, parse_estat
 from src.app.ingest.fetch import fetch_text
 from src.app.ingest.rss import parse_rss
 from src.core.config_loader import load_sources_config
 from src.core.logging import get_logger
+from src.core.series_resolver import resolve_series_config
 from src.pipeline.run_manager import (
     create_run,
     delete_run,
@@ -22,6 +25,10 @@ from src.pipeline.run_manager import (
     run_exists,
 )
 from src.storage.db import connect
+from src.storage.indicator_series import (
+    upsert_dim_indicator_series,
+    upsert_fact_indicator_series_run,
+)
 from src.storage.migrate import init_db
 
 logger = get_logger(__name__)
@@ -177,6 +184,7 @@ def run_pipeline(
     init_db()
     conn = connect()
     run_started_at = None
+    series_stats: Dict[str, int] = {"resolved": 0, "unresolved": 0, "errors": 0}
 
     run_id = _ensure_run_id(conn, run_id, overwrite_run)
     if overwrite_run:
@@ -185,6 +193,63 @@ def run_pipeline(
         run_id, run_started_at = create_run(
             run_mode=mode, params_json="{}", conn=conn, run_id=run_id
         )
+
+        # Series registry ingest (best-effort, no external fetch)
+        try:
+            resolve_series_config(config_path, conn)
+            series_path = config_path / "series.yml"
+            series_keys: list[str] = []
+            if series_path.exists():
+                data = yaml.safe_load(series_path.read_text(encoding="utf-8")) or {}
+                series_keys = [
+                    entry.get("key") for entry in data.get("series", []) if entry.get("key")
+                ]
+            series_rows: list[dict] = []
+            if series_keys:
+                placeholders = ",".join("?" for _ in series_keys)
+                query = f"""
+                    SELECT series_key, resolver_type, resolver_value, resolved_id, status, message
+                    FROM dim_series_resolution
+                    WHERE series_key IN ({placeholders})
+                """
+                fetched = conn.execute(query, series_keys).fetchall()
+                existing = {row[0]: row for row in fetched}
+                for key in series_keys:
+                    if key in existing:
+                        row = existing[key]
+                        series_rows.append(
+                            {
+                                "series_key": row[0],
+                                "resolver_type": row[1],
+                                "resolver_value": row[2],
+                                "resolved_id": row[3],
+                                "status": row[4],
+                                "message": row[5],
+                            }
+                        )
+                    else:
+                        series_rows.append(
+                            {
+                                "series_key": key,
+                                "resolver_type": None,
+                                "resolver_value": None,
+                                "resolved_id": None,
+                                "status": "unresolved",
+                                "message": "No resolution record",
+                            }
+                        )
+            resolved_rows = [
+                row for row in series_rows if row["status"] == "resolved" and row.get("resolved_id")
+            ]
+            series_stats["resolved"] = len(resolved_rows)
+            series_stats["unresolved"] = len(
+                [r for r in series_rows if r["status"] == "unresolved"]
+            )
+            series_stats["errors"] = len([r for r in series_rows if r["status"] == "error"])
+            upsert_fact_indicator_series_run(conn, run_id, series_rows)
+            upsert_dim_indicator_series(conn, resolved_rows)
+        except Exception as exc:  # pragma: no cover - best-effort
+            logger.warning("Series registry ingest skipped: %s", exc)
 
         allowed_urls = {s.url for s in sources_config.sources if s.url}
         fetch_fn = fetcher or _default_fetcher
@@ -290,6 +355,7 @@ def run_pipeline(
         "item_count": len(unique_items),
         "source_count": len(enabled_sources),
         "sources": source_stats,
+        "series_registry": series_stats,
     }
     output_dir = _write_exports(run_id, unique_items, stats)
     return run_id, output_dir

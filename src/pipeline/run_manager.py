@@ -109,7 +109,15 @@ def run_exists(run_id: str, conn: Optional[DuckDBPyConnection] = None) -> bool:
 
 def delete_run(run_id: str, conn: Optional[DuckDBPyConnection] = None) -> None:
     connection = conn or connect()
-    for table in ("fact_source_run", "items", "sources", "alerts", "runs", "fact_run"):
+    for table in (
+        "fact_indicator_series_run",
+        "fact_source_run",
+        "items",
+        "sources",
+        "alerts",
+        "runs",
+        "fact_run",
+    ):
         try:
             connection.execute(f"DELETE FROM {table} WHERE run_id = ?", [run_id])
         except Exception:
