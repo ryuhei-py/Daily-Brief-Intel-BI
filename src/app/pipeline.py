@@ -132,6 +132,39 @@ def _dedupe_items(items: Iterable[Dict[str, object]]) -> List[Dict[str, object]]
     return unique
 
 
+def _upsert_item_latest(conn, run_id: str, item: Dict[str, object]) -> None:
+    conn.execute(
+        """
+        INSERT INTO items (
+            run_id, source_id, source_name, category, kind,
+            title, summary, url, published_at, fetched_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (source_id, url) DO UPDATE SET
+            run_id = EXCLUDED.run_id,
+            source_name = EXCLUDED.source_name,
+            category = EXCLUDED.category,
+            kind = EXCLUDED.kind,
+            title = EXCLUDED.title,
+            summary = EXCLUDED.summary,
+            published_at = EXCLUDED.published_at,
+            fetched_at = EXCLUDED.fetched_at
+        """,
+        [
+            run_id,
+            item["source_id"],
+            item["source_name"],
+            item["category"],
+            item["kind"],
+            item["title"],
+            item["summary"],
+            item["url"],
+            item["published_at"],
+            item["fetched_at"],
+        ],
+    )
+
+
 def run_pipeline(
     config_dir: Path | str = "config",
     mode: str = "manual",
@@ -222,27 +255,7 @@ def run_pipeline(
             )
 
         for item in unique_items:
-            conn.execute(
-                """
-                INSERT INTO items (
-                    run_id, source_id, source_name, category, kind,
-                    title, summary, url, published_at, fetched_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    run_id,
-                    item["source_id"],
-                    item["source_name"],
-                    item["category"],
-                    item["kind"],
-                    item["title"],
-                    item["summary"],
-                    item["url"],
-                    item["published_at"],
-                    item["fetched_at"],
-                ],
-            )
+            _upsert_item_latest(conn, run_id, item)
 
         finished_at = datetime.now(timezone.utc)
         conn.execute(

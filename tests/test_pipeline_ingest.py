@@ -81,3 +81,57 @@ def test_pipeline_ingests_and_exports(tmp_path: Path, monkeypatch):
     assert (output_dir / "alerts.json").exists()
     csv_content = (output_dir / "brief_items.csv").read_text(encoding="utf-8").strip()
     assert "Item One" in csv_content
+
+
+def test_pipeline_dedupes_items_across_runs_by_url(tmp_path: Path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    sources = {
+        "sources": [
+            {
+                "id": "rss1",
+                "name": "RSS Source",
+                "category": "jp",
+                "kind": "rss",
+                "url": "https://example.com/rss",
+                "enabled": True,
+            }
+        ]
+    }
+    (config_dir / "sources.yml").write_text(yaml.safe_dump(sources), encoding="utf-8")
+
+    rss_text = (Path("tests/fixtures/rss_sample.xml")).read_text(encoding="utf-8")
+
+    def fake_fetch(url: str, allowed_urls):
+        assert any(str(url).startswith(prefix) for prefix in allowed_urls)
+        return rss_text
+
+    db_path = tmp_path / "app.duckdb"
+    monkeypatch.setenv("APP_DB_PATH", str(db_path))
+    monkeypatch.setenv("APP_OUTPUT_ROOT", str(tmp_path / "output/runs"))
+
+    import src.app.pipeline as pipeline
+
+    importlib.reload(pipeline)
+
+    monkeypatch.setenv("RUN_ID", "run-1")
+    pipeline.run_pipeline(config_dir=config_dir, mode="manual", fetcher=fake_fetch)
+    conn = duckdb.connect(str(db_path))
+    count1 = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+
+    monkeypatch.setenv("RUN_ID", "run-2")
+    pipeline.run_pipeline(config_dir=config_dir, mode="manual", fetcher=fake_fetch)
+    count2 = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+
+    assert count2 == count1
+    dup_count = conn.execute(
+        """
+        SELECT COUNT(*) FROM (
+            SELECT source_id, url, COUNT(*) c
+            FROM items
+            GROUP BY source_id, url
+            HAVING c > 1
+        )
+        """
+    ).fetchone()[0]
+    assert dup_count == 0
