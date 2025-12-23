@@ -3,3 +3,17 @@ series:
     resolver:
       type: passthrough
       value: headline
+series:
+  - key: ok_passthrough
+    resolver:
+      type: passthrough
+      value: headline
+
+  - key: bad_type
+    resolver:
+      type: nope
+      value: x
+
+  - key: missing_value
+    resolver:
+      type: passthrough

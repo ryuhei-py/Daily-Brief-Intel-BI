@@ -7,7 +7,9 @@ from pathlib import Path
 from src.app.pipeline import run_pipeline
 from src.core.config_loader import print_validation_report
 from src.core.logging import get_logger
+from src.core.series_resolver import resolve_series_config
 from src.pipeline.run_lock import RunLock, RunLockedError
+from src.storage.db import connect
 from src.storage.migrate import init_db
 
 logger = get_logger(__name__)
@@ -50,6 +52,30 @@ def cmd_run(args: argparse.Namespace) -> int:
         lock.release()
 
 
+def cmd_resolve_series(args: argparse.Namespace) -> int:
+    config_dir = Path(args.config_dir).resolve()
+    try:
+        init_db()
+        conn = connect()
+        results = resolve_series_config(config_dir, conn)
+        resolved = sum(1 for r in results.values() if r.get("status") == "resolved")
+        unresolved = sum(1 for r in results.values() if r.get("status") == "unresolved")
+        errors = sum(1 for r in results.values() if r.get("status") == "error")
+        unresolved_keys = [k for k, v in results.items() if v.get("status") != "resolved"][:20]
+        print(f"Resolved: {resolved}, Unresolved: {unresolved}, Errors: {errors}")
+        if unresolved_keys:
+            print(f"Unresolved keys: {', '.join(unresolved_keys)}")
+        return 0
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.error("Series resolution failed: %s", exc)
+        return 1
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tool", description="Utility commands")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -72,6 +98,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Overwrite existing data for the provided run id if it exists",
     )
     run_parser.set_defaults(func=cmd_run)
+
+    resolve_parser = subparsers.add_parser("resolve-series", help="Resolve series configuration")
+    resolve_parser.add_argument("--config-dir", default="config", help="Path to config directory")
+    resolve_parser.set_defaults(func=cmd_resolve_series)
 
     return parser
 
