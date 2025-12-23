@@ -41,7 +41,7 @@
               <td style="padding: 6px 4px; vertical-align: top;">
                 <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
               </td>
-              <td style="padding: 6px 4px; vertical-align: top;">{{ item.summary[:200] }}</td>
+              <td style="padding: 6px 4px; vertical-align: top;">{{ (item.summary or "")[:200] }}</td>
             </tr>
           {% endfor %}
         </tbody>
