@@ -22,28 +22,28 @@ def test_latest_run_and_items_ordering(tmp_path):
     )
     conn.execute(
         """
-    INSERT INTO items (
-        run_id,
-        source_id,
-        source_name,
-        category,
-        kind,
-        title,
-        summary,
-        url,
-        published_at,
-        fetched_at
-    )
-    VALUES
-        (
-            'r1','s1','Source A','jp','rss','Old','Old summary',
-            'https://a', '2024-01-01', '2024-01-01T00:00:00Z'
-        ),
-        (
-            'r1','s1','Source A','jp','rss','New','New summary',
-            'https://b', '2024-01-02', '2024-01-02T00:00:00Z'
+        INSERT INTO items (
+            run_id,
+            source_id,
+            source_name,
+            category,
+            kind,
+            title,
+            summary,
+            url,
+            published_at,
+            fetched_at
         )
-    """
+        VALUES
+            (
+                'r1','s1','Source A','jp','rss','Old','Old summary',
+                'https://a', '2024-01-01', '2024-01-01T00:00:00Z'
+            ),
+            (
+                'r1','s1','Source A','jp','rss','New','New summary',
+                'https://b', '2024-01-02', '2024-01-02T00:00:00Z'
+            )
+        """
     )
 
     latest = queries.get_latest_run(conn)
