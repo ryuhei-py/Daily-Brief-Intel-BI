@@ -4,11 +4,51 @@
 <div class="card">
   <h2>Daily Brief</h2>
   {% if latest_run %}
-    <p class="muted">Last successful run: {{ latest_run.run_id }}</p>
-    <p>Status: {{ latest_run.status }} | Mode: {{ latest_run.run_mode }}</p>
+    <p class="muted">Last run: {{ latest_run.run_id }}</p>
+    <p>Status: {{ latest_run.status }}{% if latest_run.run_mode %} | Mode: {{ latest_run.run_mode }}{% endif %}</p>
     <p>Started: {{ latest_run.started_at }} | Ended: {{ latest_run.ended_at }}</p>
+    {% if counts %}
+      <h4>Item counts by source</h4>
+      <ul>
+        {% for row in counts %}
+          <li>{{ row.source_name }}: {{ row.count }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
   {% else %}
     <p class="muted">No data yet.</p>
   {% endif %}
 </div>
+
+{% if latest_run %}
+  <div class="card" style="margin-top:16px;">
+    <h3>Items</h3>
+    {% if items %}
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding: 6px 4px;">Published</th>
+            <th style="text-align:left; padding: 6px 4px;">Source</th>
+            <th style="text-align:left; padding: 6px 4px;">Title</th>
+            <th style="text-align:left; padding: 6px 4px;">Summary</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <td style="padding: 6px 4px; vertical-align: top;">{{ item.published_at or "-" }}</td>
+              <td style="padding: 6px 4px; vertical-align: top;">{{ item.source_name }}</td>
+              <td style="padding: 6px 4px; vertical-align: top;">
+                <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+              </td>
+              <td style="padding: 6px 4px; vertical-align: top;">{{ item.summary[:200] }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">No items yet.</p>
+    {% endif %}
+  </div>
+{% endif %}
 {% endblock %}

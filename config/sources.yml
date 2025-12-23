@@ -2,13 +2,14 @@ sources:
   - id: tokyo_metro_news
     name: Tokyo Metro News
     category: jp
-    enabled: false
+    enabled: true
     kind: rss
-    url: https://www.metro.tokyo.lg.jp/rss/feeds/rss_news.xml
+    url: https://www.metro.tokyo.lg.jp/index.html/-/asset_publisher/knkg/rss
+
   - id: estat_population
     name: e-Stat Population Snapshot
     category: jp
-    enabled: true
+    enabled: false
     kind: estat_api
     url: https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData
     params:
