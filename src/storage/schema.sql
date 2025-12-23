@@ -58,3 +58,13 @@ CREATE TABLE IF NOT EXISTS alerts (
     alert_type TEXT,
     message TEXT
 );
+
+CREATE TABLE IF NOT EXISTS dim_series_resolution (
+    series_key TEXT PRIMARY KEY,
+    resolver_type TEXT,
+    resolver_value TEXT,
+    resolved_id TEXT,
+    status TEXT,
+    message TEXT,
+    updated_at TIMESTAMP
+);
