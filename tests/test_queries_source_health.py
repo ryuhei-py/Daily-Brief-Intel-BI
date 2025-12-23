@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from duckdb import DuckDBPyConnection
 
+RunDict = dict[str, Any]
+ItemDict = dict[str, Any]
+CountDict = dict[str, Any]
+HealthDict = dict[str, Any]
 
-def get_latest_success_run(conn: DuckDBPyConnection) -> Optional[dict]:
+
+def get_latest_success_run(conn: DuckDBPyConnection) -> Optional[RunDict]:
     row = conn.execute(
         """
         SELECT
@@ -22,20 +27,13 @@ def get_latest_success_run(conn: DuckDBPyConnection) -> Optional[dict]:
         """
     ).fetchone()
 
-    if not row:
+    if row is None:
         return None
 
-    return {
-        "run_id": row[0],
-        "started_at": row[1],
-        "ended_at": row[2],
-        "status": row[3],
-        "run_mode": row[4],
-        "params_json": row[5],
-    }
+    return _run_row_to_dict(row)
 
 
-def get_latest_run(conn: DuckDBPyConnection) -> Optional[dict]:
+def get_latest_run(conn: DuckDBPyConnection) -> Optional[RunDict]:
     row = conn.execute(
         """
         SELECT
@@ -52,9 +50,13 @@ def get_latest_run(conn: DuckDBPyConnection) -> Optional[dict]:
         """
     ).fetchone()
 
-    if not row:
+    if row is None:
         return None
 
+    return _run_row_to_dict(row)
+
+
+def _run_row_to_dict(row: tuple[Any, ...]) -> RunDict:
     return {
         "run_id": row[0],
         "started_at": row[1],
@@ -65,7 +67,11 @@ def get_latest_run(conn: DuckDBPyConnection) -> Optional[dict]:
     }
 
 
-def get_items_for_run(conn: DuckDBPyConnection, run_id: str, limit: int = 200) -> list[dict]:
+def get_items_for_run(
+    conn: DuckDBPyConnection,
+    run_id: str,
+    limit: int = 200,
+) -> list[ItemDict]:
     rows = conn.execute(
         """
         SELECT
@@ -98,7 +104,7 @@ def get_items_for_run(conn: DuckDBPyConnection, run_id: str, limit: int = 200) -
     ]
 
 
-def get_item_counts_by_source(conn: DuckDBPyConnection, run_id: str) -> list[dict]:
+def get_item_counts_by_source(conn: DuckDBPyConnection, run_id: str) -> list[CountDict]:
     rows = conn.execute(
         """
         SELECT
@@ -119,15 +125,13 @@ def get_source_health(
     conn: DuckDBPyConnection,
     latest_run_id: str,
     lookback_runs: int = 20,
-) -> list[dict]:
+) -> list[HealthDict]:
     """
-    Per-source health metrics across the last N runs (by fact_run.started_at DESC).
+    Per-source health metrics across the last N runs (fact_run.started_at DESC).
 
-    - success_rate (%)
-    - consecutive_failures (from most recent backwards until first success)
-    - avg_duration_seconds
-    - last status/error metadata
-    - last_success_at / last_failure_at
+    Notes:
+    - "consecutive_failures" counts failures from the most recent backwards until the first success.
+    - source_name is taken from the sources table for latest_run_id (so UI uses current names).
     """
     rows = conn.execute(
         """
@@ -199,7 +203,8 @@ def get_source_health(
                 source_id,
                 SUM(
                     CASE
-                        WHEN status != 'success' AND success_seen = 0 THEN 1
+                        WHEN status != 'success' AND success_seen = 0
+                            THEN 1
                         ELSE 0
                     END
                 ) AS consecutive_failures
