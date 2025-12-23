@@ -58,9 +58,7 @@ def test_pipeline_ingests_and_exports(tmp_path: Path, monkeypatch):
 
     # DB assertions
     conn = duckdb.connect(str(db_path))
-    item_count = conn.execute(
-        "SELECT COUNT(*) FROM items WHERE run_id = ?", [run_id]
-    ).fetchone()[0]
+    item_count = conn.execute("SELECT COUNT(*) FROM items WHERE run_id = ?", [run_id]).fetchone()[0]
     assert item_count >= 2
 
     fact_run = conn.execute(

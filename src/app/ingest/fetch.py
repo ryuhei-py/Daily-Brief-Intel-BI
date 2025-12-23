@@ -26,7 +26,7 @@ def fetch_text(
     last_exc: Exception | None = None
     for _ in range(MAX_RETRIES + 1):
         try:
-            with httpx.Client(timeout=timeout, headers=headers) as client:
+            with httpx.Client(timeout=timeout, headers=headers, follow_redirects=True) as client:
                 response = client.get(url)
                 response.raise_for_status()
                 return response.text

@@ -149,7 +149,9 @@ def run_pipeline(
     if overwrite_run:
         shutil.rmtree(_output_root() / run_id, ignore_errors=True)
     try:
-        run_id, run_started_at = create_run(run_mode=mode, params_json="{}", conn=conn, run_id=run_id)
+        run_id, run_started_at = create_run(
+            run_mode=mode, params_json="{}", conn=conn, run_id=run_id
+        )
 
         allowed_urls = {s.url for s in sources_config.sources if s.url}
         fetch_fn = fetcher or _default_fetcher
@@ -248,7 +250,14 @@ def run_pipeline(
             INSERT INTO runs (run_id, started_at, finished_at, status, item_count, source_count)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            [run_id, run_started_at, finished_at, overall_status, len(unique_items), len(enabled_sources)],
+            [
+                run_id,
+                run_started_at,
+                finished_at,
+                overall_status,
+                len(unique_items),
+                len(enabled_sources),
+            ],
         )
         conn.commit()
         finish_run(run_id=run_id, status=overall_status, conn=conn)
